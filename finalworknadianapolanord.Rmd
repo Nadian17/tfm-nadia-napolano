@@ -1,0 +1,1078 @@
+---
+title: "tfm 2023-2024, social analysis of Italy and Spain"
+author: "Nadia Napolano"
+date: "2024-06-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+These are all the libraries that are going to be used for the analysis.
+```{r, warning=FALSE}
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(RColorBrewer)
+library(mapSpain)
+library(sf)
+library(cowplot)
+library(tidyverse) 
+library(plm) 
+library(car) 
+library(ggplot2) 
+library(lmtest)
+library(pcse)
+library(tseries)
+library(sandwich)
+library(ggrepel)
+library(stringr)
+library(ggthemes)
+library(rnaturalearth)
+```
+Let's start adding the data.
+```{r, warning=FALSE}
+library(readxl)
+data <- read_excel("C:/Users/utente/Desktop/Nadia Napolano task 1,,_files/data_output.xlsx")
+
+# Filter the data where TIME_PERIOD is less than 2021
+data <- data |> 
+  filter(TIME_PERIOD < 2021)
+
+```
+
+
+## descriptive analysis
+
+Let's see if with data visualization we can find any insight about the situation of tho countries during the last 12 years.
+In the first part i prefer to split the data set to compare the italian and spanish situation.
+Later I will try to observe the social situation of the countries in a cohesive way.
+
+```{r}
+# let's get the name of each region
+unique(data$region)
+```
+
+```{r}
+#in this part i need to change the names to make them equivalent to tha packages that i am going to use later
+data$region <- gsub("Asturias \\(principado de\\)", "Principado de Asturias", data$region)
+data$region <- gsub("Balears \\(illes\\)", "Illes Balears", data$region)
+data$region <- gsub("Castilla - La mancha", "Castilla-La Mancha", data$region)
+data$region <- gsub("Castilla y león", "Castilla y León", data$region)
+data$region <- gsub("Comunidad valenciana", "Comunidad Valenciana", data$region)
+data$region <- gsub("Galicía", "Galicia", data$region)
+data$region <- gsub("Madrid \\(comunidad de\\)", "Comunidad de Madrid", data$region)
+data$region <- gsub("Murcia \\(region de\\)", "Región de Murcia", data$region)
+data$region <- gsub("Navarra \\(comunidad foral de\\)", "Comunidad Foral de Navarra", data$region)
+data$region <- gsub("Pais vasco", "País Vasco", data$region)
+data$region <- gsub("Rioja \\(la\\)", "La Rioja", data$region)
+data <- data |> 
+  rename(CCAA = region)
+```
+
+let's separe the regions
+
+```{r}
+# Create a vector with the names of the Italian regions
+italian_regions <- c("Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia Romagna", 
+ "Friuli Venezia Giulia", "Lazio", "Liguria", "Lombardia", "Marche", "Molise", "Piemonte", "Provincia Autonoma Bolzano", "Provincia Autonoma Trento", 
+"Puglia", "Sardegna", "Sicilia", "Toscana", "Umbria", "Valle d'Aosta", "Veneto")
+
+# Create a vector with the names of the Spanish regions
+spanish_regions <- c("País Vasco", "Castilla-La Mancha", "Comunidad Valenciana", "Andalucía",  "Castilla y León", "Extremadura", "Illes Balears", "Cataluña", "Galicia", 
+ "Aragón", "La Rioja", "Comunidad de Madrid", "Región de Murcia",  "Comunidad Foral de Navarra", "Principado de Asturias", "Canarias", "Cantabria")
+
+# Filter the dataset for Italian regions
+data_italy <- data |>  filter(CCAA %in% italian_regions)
+
+# Filter the dataset for Spanish regions
+data_spain <- data |>  filter(CCAA %in% spanish_regions)
+
+```
+
+```{r}
+#these are all the information that I get from my dataset
+names(data_spain)
+```
+
+### Number of suicides in Spain
+```{r, warning=FALSE}
+# Create the color palette
+palette <- c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "black",
+             "#FFFF33", "#A65628", "#F781BF", "#999999", "#66C2A5",
+             "#FC8D62", "#8DA0CB", "#E78AC3", "#A6D854", "#FFD92F",
+             "#E5C494", "#B3B3B3")
+
+# Create the graph
+ggplot(data_spain, aes(x = TIME_PERIOD, y = suicides, color = CCAA)) +
+  geom_line(size = 0.8) + 
+  geom_point(size = 0.5) + 
+  scale_color_manual(values = palette) +
+  scale_x_continuous(breaks = seq(min(data_spain$TIME_PERIOD), max(data_spain$TIME_PERIOD), by = 2)) + 
+  labs(title = "Number of Suicides per Region in Spain (2008-2020)",
+       subtitle = "",  
+       x = "Year",  
+       y = "Number of Suicides", 
+       color = "Region") +
+  theme_minimal() +  
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+
+```
+In this graph it is possible to observe the behaviour of the number of suicides for each region in spain
+
+Let's try to compare large and small cities
+```{r, warning=FALSE}
+# filtering the regions i am more interested to analyse
+regions <- c("Andalucía", "Comunidad de Madrid", "Cataluña", "Comunidad Valenciana",
+             "La Rioja", "Comunidad Foral de Navarra", "Cantabria", "Asturias")
+data_spain_filter <- data_spain |> 
+  filter(CCAA %in% regions)
+
+#choosing the colour palette
+palette <- c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3",
+             "darkorange", "#A65628",  "#999999", "#66C2A5")
+
+# Creating the graph
+ggplot(data_spain_filter, aes(x = TIME_PERIOD, y = suicides, color = CCAA)) +
+  geom_line(size = 0.8) + 
+  geom_point(size = 0.5) +  
+  scale_color_manual(values = palette) + 
+  scale_x_continuous(breaks = seq(min(data_spain_filter$TIME_PERIOD), max(data_spain_filter$TIME_PERIOD), by = 2)) + 
+  labs(title = "Number of Suicides per Region in Spain (2008-2020)", 
+       x = "Year",  
+       y = "Number of Suicides",  
+       color = "Region") +  
+  theme_minimal() +  
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    panel.background = element_rect(fill = "beige"),
+    plot.background = element_rect(fill = "beige")
+  )
+
+```
+
+### Unemployment in Spain
+
+```{r}
+# i need to filter the time period, because some data are missing
+data_spain_filter <- data_spain |> 
+  filter( TIME_PERIOD >= 2014, TIME_PERIOD<=2020)
+
+# colour palette
+palette <- c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "black",
+             "#FFFF33", "#A65628", "#F781BF", "#999999", "#66C2A5",
+             "#FC8D62", "#8DA0CB", "#E78AC3", "#A6D854", "#FFD92F",
+             "#E5C494", "#B3B3B3")
+
+# Creating the graph
+ggplot(data_spain_filter, aes(x = TIME_PERIOD, y = unemployment, color = CCAA)) +
+  geom_line(size = 0.8) +
+  geom_point(size = 0.5) +
+  scale_color_manual(values = palette) +
+  scale_x_continuous(breaks = seq(min(data_spain_filter$TIME_PERIOD), max(data_spain_filter$TIME_PERIOD), by = 2)) +
+  labs(title = "Unemployment in Spain(2014-2020)",
+       x = "Year",
+       y = "Percentage of Unemployment",
+       color = "Region") +
+  theme_stata() + # Applica il tema Stata
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+
+```
+
+### gender gap
+
+```{r, warning=FALSE}
+# getting geo data
+esp_can <- esp_get_country()
+can_prov <- esp_get_can_provinces()
+can_box <- esp_get_can_box()
+munic <- esp_get_munic()
+ccaa <- esp_get_ccaa()
+
+mapa <- data_spain |> 
+  select(CCAA, gender_gap_ind, TIME_PERIOD) |> 
+  distinct(CCAA, TIME_PERIOD, .keep_all = TRUE)
+
+# left join to get the correspondance between the regions name in the map and in the dataset
+mapa <- ccaa |> 
+  left_join(mapa, by = c("nuts2.name" = "CCAA"))
+
+#creating the map
+p1 <- ggplot(esp_can) +
+  geom_sf(color = "black", size = 0.7) +  
+  geom_sf(data = can_prov) +
+  geom_sf(data = can_box) + 
+  geom_sf(data = mapa, aes(fill = gender_gap_ind), color = "black", size = 0.3) +  
+  annotate("rect", xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf, alpha = 0.2, fill = "white") +  
+  geom_sf_text(data = mapa, aes(label = round(gender_gap_ind, 2), color = ifelse(gender_gap_ind > 0.5, "white", "black")), 
+               size = 2.4, check_overlap = TRUE, nudge_y = -0.03) + 
+  theme_void() +  
+  labs(title = "Gender Gap Index per CCAA") +  
+  theme(
+    legend.position = "none",
+    plot.title = element_text(family = "Calibri", size = 14),
+    text = element_text(family = "Calibri"),
+    plot.background = element_rect(fill = "white", color = NA),  
+    panel.background = element_rect(fill = "white", color = NA)  
+  ) + 
+  coord_sf() +
+  scale_fill_gradient2(low = "lightgreen", mid = "yellow", high = "darkred", midpoint = median(data_spain$gender_gap_ind, na.rm = TRUE)) +
+  scale_color_identity() +
+  facet_wrap(~ TIME_PERIOD)  # Creatingfacet per year
+# printing the graph
+print(p1)
+
+```
+
+
+```{r, warning=FALSE}
+# get geo data
+esp_can <- esp_get_country()
+can_prov <- esp_get_can_provinces()
+can_box <- esp_get_can_box()
+ccaa <- esp_get_ccaa()
+
+# filtering
+data_spain_filtered <- data_spain |> 
+  filter(TIME_PERIOD %in% c(2008, 2012, 2016, 2020))
+
+# Transform column names to lowercase and replace spaces with underscores
+data_spain_filtered <- data_spain_filtered |> 
+  rename_with(~ str_replace_all(str_to_lower(.), " ", "_"))
+
+# Select the columns
+mapa <- data_spain_filtered |> 
+  select(ccaa,`emergency_care_access_per_1000_inhabitants`, time_period) |> 
+  distinct(ccaa, time_period, .keep_all = TRUE)
+
+# looking for NAs
+print("Unique TIME_PERIOD values before join:")
+print(unique(mapa$time_period))
+
+# left join the data from the two datasets
+mapa <- ccaa %>%
+  left_join(mapa, by = c("nuts2.name" = "ccaa"))
+
+# verify again
+print("Unique TIME_PERIOD values after join:")
+print(unique(mapa$time_period))
+
+# filtering
+mapa <- mapa |> 
+  filter(time_period %in% c(2008, 2012, 2016, 2020))
+
+# Creating the map
+p1 <- ggplot() +
+  geom_sf(data = esp_can, color = "black", size = 0.7) +  
+  geom_sf(data = can_prov) +
+  geom_sf(data = can_box) + 
+  geom_sf(data = mapa, aes(fill = emergency_care_access_per_1000_inhabitants), color = "black", size = 0.3) +  
+  annotate("rect", xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf, alpha = 0.2, fill = "white") +  
+  geom_sf_text(data = mapa, aes(label = round(emergency_care_access_per_1000_inhabitants, 2), color = ifelse(emergency_care_access_per_1000_inhabitants > 0.5, "black", "purple")), 
+               size = 2.4, check_overlap = TRUE, nudge_y = -0.03) + 
+  theme_void() +  
+  labs(title = "emergency care access per CCAA") +  
+  theme(
+    legend.position = "none",
+    plot.title = element_text(family = "Calibri", size = 14),
+    text = element_text(family = "Calibri"),
+    plot.background = element_rect(fill = "white", color = NA),  
+    panel.background = element_rect(fill = "white", color = NA)  
+  ) + 
+  coord_sf() +
+  scale_fill_gradient2(low = "lightgreen", mid = "yellow", high = "darkred", midpoint = median(data_spain_filtered$emergency_care_access_per_1000_inhabitants, na.rm = TRUE)) +
+  scale_color_identity() +
+  facet_wrap(~ time_period, ncol = 2)  # Creare i facet per TIME_PERIOD
+
+# Stampare il grafico
+print(p1)
+
+
+```
+
+
+```{r, warning=FALSE}
+# Load geographic data
+esp_can <- esp_get_country()
+can_prov <- esp_get_can_provinces()
+can_box <- esp_get_can_box()
+regions <- esp_get_ccaa()
+
+
+# Select the necessary columns and remove duplicates
+map_data <- data_spain_filtered |> 
+  select(ccaa, employment_value, time_period) |> 
+  distinct(ccaa, time_period, .keep_all = TRUE)
+
+# Check for NA in the time_period field before joining
+print("Unique time_period values before join:")
+print(unique(map_data$time_period))
+
+# Join the geographic data with the gender gap data
+map_data <- regions  |> 
+  left_join(map_data, by = c("nuts2.name" = "ccaa"))
+
+# Check for NA in the time_period field after joining
+print("Unique time_period values after join:")
+print(unique(map_data$time_period))
+
+# Filter the data again after the join for safety
+map_data <- map_data |> 
+  filter(time_period %in% c(2008, 2012, 2016, 2020))
+
+# Create the map
+p1 <- ggplot() +
+  geom_sf(data = esp_can, color = "black", size = 0.7) +  
+  geom_sf(data = can_prov) +
+  geom_sf(data = can_box) + 
+  geom_sf(data = map_data, aes(fill = employment_value), color = "black", size = 0.3) +  
+  annotate("rect", xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf, alpha = 0.2, fill = "white") +  
+  geom_sf_text(data = map_data, aes(label = round(employment_value, 2), color = ifelse(employment_value > 0.5, "black", "black")), 
+               size = 2.4, check_overlap = TRUE, nudge_y = -0.03) + 
+  theme_void() +  
+  labs(title = "Employment per Region in Spain") +  
+  theme(
+    legend.position = "none",
+    plot.title = element_text(family = "Calibri", size = 14),
+    text = element_text(family = "Calibri"),
+    plot.background = element_rect(fill = "white", color = NA),  
+    panel.background = element_rect(fill = "white", color = NA)  
+  ) + 
+  coord_sf() +
+  scale_fill_gradient2(low = "darkred", mid = "yellow", high = "lightgreen", midpoint = median(data_spain_filtered$employment_value, na.rm = TRUE)) +
+  scale_color_identity() +
+  facet_wrap(~ time_period, ncol = 2)  # Create facets for time_period
+
+# Print the plot
+print(p1)
+
+```
+
+## early leaver education
+
+```{r}
+# Ensure that TIME_PERIOD is numeric
+data_spain$TIME_PERIOD <- as.numeric(data_spain$TIME_PERIOD)
+
+
+# colour palette
+palette <- c("#E41A1C", "darkorange", "darkgreen", "#984EA3", "black",
+             "#FFFF33", "#A65628", "deeppink1", "#999999", "#66C2A5",
+             "rosybrown1", "blue1", "cyan", "chartreuse1", "#FFD92F",
+             "deepskyblue", "bisque1")
+
+# Creating the graph
+ggplot(data_spain, aes(x = TIME_PERIOD, y = early_leaver_educ, color = CCAA)) +
+  geom_line(size = 0.8) + geom_point(size = 0.5) +
+  scale_x_continuous(breaks = seq(min(data_spain$TIME_PERIOD), max(data_spain$TIME_PERIOD), by = 2))+
+  scale_color_manual(values = palette) +  labs(title = "Early leaver in education",
+       x = "Year",
+       y = "Percentage of leavers",
+       color = "Region") + 
+  theme_minimal() + 
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+
+```
+
+
+### Not working and not studying
+```{r, warning=FALSE}
+
+# Create a new column to identify if the TIME_PERIOD is 2020 and label it appropriately
+data_spain <- data_spain |> 
+  mutate(is_2020_label = ifelse(TIME_PERIOD == 2020, "Year 2020", "Other Years"))
+
+# Filter out the extremes for labeling
+highest <- data_spain |> 
+  filter(not_work_or_study == max(not_work_or_study))
+lowest <- data_spain |> 
+  filter(not_work_or_study == min(not_work_or_study))
+extremes <- rbind(highest, lowest)
+
+# Create the scatter plot to see the relationship
+scatter_plot <- ggplot(data_spain, aes(x = family_income, y = not_work_or_study, color = CCAA)) +
+  geom_label_repel(data = extremes, aes(label = paste(CCAA, TIME_PERIOD, sep = ", ")), size = 3.5, box.padding = 0.5, point.padding = 0.5) +
+  geom_point(aes(shape = is_2020_label), size = 1.7) +
+  scale_shape_manual(values = c("Other Years" = 16, "Year 2020" = 17)) + # Use 16 (circle) for other years and 17 (triangle) for 2020
+  scale_color_manual(values = palette) + # Use the custom defined palette
+  labs(title = "Scatter Plot: Family Income vs Not Work or Study",
+       x = "Family Income",
+       y = "Not Working or Studying (%)",
+       color = "Region",
+       shape = "Year") + # Update the legend title for shapes
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    legend.position = "right",
+    legend.title = element_text(face = "bold"),
+    panel.grid.major = element_line(color = "grey80"),
+    panel.grid.minor = element_blank(),
+    axis.title.x = element_text(margin = margin(t = 10)),
+    axis.title.y = element_text(margin = margin(r = 10))
+  )
+
+# Display the plot
+scatter_plot
+```
+i am really proud of this graph :)
+```{r}
+
+# Create the line plot for not_work_or_study
+line_plot_not_work_or_study <- ggplot(data_spain, aes(x = TIME_PERIOD, y = not_work_or_study, color = CCAA)) +
+  geom_line(size = 0.8) +
+  geom_point(size = 2) +
+  scale_color_manual(values = palette) +
+  scale_x_continuous(breaks = seq(min(data_spain$TIME_PERIOD), max(data_spain$TIME_PERIOD), by = 2))+
+  labs(title = "Not Working or Studying",
+       x = "Year",
+       y = "",
+       color = "Region") +
+  theme_minimal()
+
+# Create the line plot for family_income
+line_plot_family_income <- ggplot(data_spain, aes(x = TIME_PERIOD, y = family_income, color = CCAA)) +
+  geom_line(size = 0.8) +
+  geom_point(size = 2) +
+  scale_color_manual(values = palette) + 
+  scale_x_continuous(breaks = seq(min(data_spain$TIME_PERIOD), max(data_spain$TIME_PERIOD), by = 2))+
+  labs(title = "Family Income",
+       x = "Year",
+       y = "",
+       color = "Region") +
+  theme_minimal()
+
+# Estrai la legenda da uno dei grafici
+legend <- get_legend(line_plot_family_income)
+
+# Rimuovi la legenda dai grafici originali
+line_plot_family_income <- line_plot_family_income + theme(legend.position = "none")
+line_plot_not_work_or_study <- line_plot_not_work_or_study + theme(legend.position = "none")
+
+combined_plots <- plot_grid(
+  line_plot_family_income, 
+  line_plot_not_work_or_study, 
+  ncol = 2, 
+  align = 'v'
+)
+
+# Aggiungi la legenda a destra dei grafici combinati
+final_plot <- plot_grid(
+  combined_plots,
+  ncol = 1, 
+ rel_widths = c(2) # Puoi regolare la larghezza relativa della legenda
+)
+
+# Visualizza il grafico finale
+print(final_plot)
+```
+
+it is a slight perception, but especially in 2020 one can see that the two graphs have an inverse behaviour.
+
+## Analytical part: behavior of the percentage of school dropout and socioeconomic variables
+
+```{r, error=FALSE, fig.width=8, fig.height=6}
+D<-pdata.frame(data, index=c("CCAA", "TIME_PERIOD")) #declare TSCS data, identify unit and time variables
+coplot(early_leaver_educ ~ TIME_PERIOD | CCAA, type="l", data=D) 
+```
+The x-axis represents TIME_PERIOD, which appears to range from approximately 2008 to 2020.
+The y-axis represents early_leaver_educ, with values ranging roughly between 10 and 40.
+Each horizontal strip (panel) corresponds to a specific region.
+
+The lines within each panel show how early_leaver_educ changes over time for each region.Looking at it we can observe that most regions seem to show a general downward trend in early_leaver_educ over time, indicating that the percentage of early leavers from education is decreasing.
+
+```{r, error=FALSE, fig.width=8, fig.height=6}
+# fixing the columns name to make the analysis easier
+data <- data |> 
+ rename_all(~ gsub(" ", "_", .)) |> 
+rename_all(tolower)
+# printing the names
+print(colnames(data))
+D<-pdata.frame(data, index=c("ccaa", "time_period")) #declare TSCS data, identify unit and time variables
+
+coplot(emergency_care_access_per_1000_inhabitants ~ time_period | ccaa, type="l", data=D) 
+
+```
+
+
+```{r}
+scatterplot(emergency_care_access_per_1000_inhabitants ~ ccaa, data=D)
+```
+The above figure shows two things. First, and most important, levels of unemployment clearly differ starkly accross regions. 
+higher overall levels. Second, the figure also shows some heteroscedasticity, that is uneven variance between region.
+
+
+```{r}
+scatterplot(early_leaver_educ ~ ccaa, data=D)
+```
+this graph enhance how the situation changes in each region
+
+### anova analysis 
+Next, let’s run an analysis of variance to assess more formally whether this data suffers from unit effects.
+```{r}
+
+anova<-aov(early_leaver_educ ~ ccaa, data=D) #run ANOVA 
+summary(anova) #view results
+
+```
+
+The ANOVA results above show a very low p-value, suggesting significant unit effects. This means that there is important variation in school leaving across our 38 regions. 
+This suggests that regular OLS analysis will be biased!
+let’s estimate it anyway to see the results.
+```{r}
+ols<-lm(early_leaver_educ~ gdp_regione + employment_value + inequality80_20 +risk_poverty, data=D)
+summary(ols)
+```
+There are two general approaches to dealing with unit effects:
+1) Fixed effects models
+2) Random effects models
+
+## fixed effects
+```{r}
+
+fe<-plm(early_leaver_educ~ gdp_regione + employment_value + inequality80_20 +risk_poverty, data=D, index=c("ccaa","time_period"), model="within")
+#define model, data, unit and time variables, 'within' suggests *fixed effects estimator*
+summary(fe)
+
+```
+
+employment_value is the only very significant variable: The coefficient is -0.70456 with a standard error of 0.058031. This means that for each unit increase in employment value, the early leaver education rate decreases by approximately 0.70456. This effect is highly statistically significant (p-value < 2e-16).
+
+Let’s compare this estimate with a dummy variable model, which is estimated simply by running an OLS model and including country dummies:
+
+```{r}
+fe.dummy<-lm(early_leaver_educ~ gdp_regione + employment_value + inequality80_20 +risk_poverty +factor(ccaa)-1, data=D)
+summary(fe.dummy)
+
+```
+
+the risk of poverty is less significant than before!!
+```{r}
+re<-plm(early_leaver_educ ~ gdp_regione + employment_value + 
+    inequality80_20 + risk_poverty, data=D, index=c("ccaa","time_period"), model="random")
+#same logic as FE estimation above, but "random" specifies RE estimator
+summary(re)
+```
+The random effects model using Swamy-Arora's transformation shows that employment value, income inequality, and risk of poverty are significant predictors of early leaver education rates.
+Employment value and risk of poverty have significant negative impacts, while income inequality has a positive impact. 
+The individual-specific effects explain a substantial portion of the variance (76.1%), with the remaining 23.9% attributed to idiosyncratic effects.
+
+
+### Fixed or random effects?
+One way to check is to run the Hausman test. Here H0 is that
+the preferred model is RE. The alternative Ha is that it is FE.
+```{r}
+library(plm)
+phtest(fe,re)
+```
+This effectively tests the strong assumption that the errors are uncorrelated with the
+predictors. If the p − value > 0.05, the assumption does not hold. We should then use
+fixed effects. This is our case here, so our fixed effects model is preferable.
+
+Fixed Effects (FE) and Random Effects (RE) models have some problems too: the first ones can't estimate effects of variables that don't change over time, and the second ones assumes unit effects are uncorrelated with predictors. For this reason Beck and Katz (1995) suggested using Ordinary Least Squares (OLS) with corrected standard errors to account for error correlation and autocorrelation. The Panel Corrected Standard Errors (PCSE), only adjusts the standard errors, not the estimated coefficients. Thus,it provides the same coefficients as OLS but with more reliable significance tests.
+
+```{r}
+# Identify the columns to use
+cols <- c("early_leaver_educ", "gdp_regione", "employment_value", 
+          "inequality80_20", "risk_poverty", "ccaa", "time_period")
+# removing the NAs
+D_clean <- D[complete.cases(D[cols]), ]
+
+# ols model
+ols <- lm(early_leaver_educ ~ gdp_regione + employment_value + 
+          inequality80_20 + risk_poverty, data=D_clean)
+summary(ols)
+# apply pcse function
+pcse_results <- pcse(ols, groupN=D_clean$ccaa, groupT=D_clean$time_period, pairwise=TRUE)
+
+#Results
+summary(pcse_results)
+```
+
+An increase in regional GDP (gdp_region) is associated with a slight reduction in the early education drop-out rate.
+An increase in employment value (employment_value) is associated with a significant reduction in the early education drop-out rate.
+An increase in inequality (inequality80_20) is associated with a significant increase in the early education drop-out rate.
+An increase in the risk of poverty (risk_poverty) is associated with a significant reduction in the rate of early school leaving.
+
+
+PCSE, sadly, cannot deal with the big problem, potentially biasing the estimates – unit effects.
+So Beck and Katz proposed a lagged dependent variable (LDV) in the OLS model before calculating the PCSE.
+
+
+```{r, warning=FALSE}
+
+D <- D  |> 
+  group_by(ccaa, time_period) |> 
+  mutate(l.early_leaver_educ = lag(early_leaver_educ)) |> 
+  mutate(d.gdp_regione = gdp_regione - lag(gdp_regione)) |> 
+  mutate(d.employment_value = employment_value - lag(employment_value)) |> 
+  mutate(d.inequality80_20 = inequality80_20 - lag(inequality80_20)) |> 
+  mutate(d.risk_poverty = risk_poverty - lag(risk_poverty))
+
+
+D_clean <- D |> filter(complete.cases(l.early_leaver_educ, d.gdp_regione, d.employment_value, d.inequality80_20, d.risk_poverty))
+
+
+ols <- lm(l.early_leaver_educ ~  gdp_regione + employment_value + 
+          inequality80_20 + risk_poverty, data=D_clean)
+
+
+pcse_results <- pcse(ols, groupN=D_clean$ccaa, groupT=D_clean$time_period, pairwise=TRUE)
+
+summary(pcse_results)
+
+```
+let's try a difference model!
+
+```{r, warning=FALSE}
+# Create lagged and differenced variables
+data <- data |> 
+  group_by(ccaa) |> 
+  mutate(
+    l.early_leav = dplyr::lag(early_leaver_educ),          # Create lag of early leaver education
+    d.empl = employment_value - dplyr::lag(employment_value),  # Create difference of employment
+    d.gdp.cap = gdp_regione - dplyr::lag(gdp_regione),      # Create difference of GDP per capita
+    d.ineq_ed = inequality80_20 - dplyr::lag(inequality80_20),  # Create difference of inequality in educational expenditure
+    d.risk_pov = risk_poverty - dplyr::lag(risk_poverty)    # Create difference of risk of poverty
+  )
+
+# Augmented Dickey-Fuller (ADF) test for each panel, removing NA
+adf_results <- data |> 
+  group_by(ccaa) |> 
+  summarize(
+    adf_early_leav = ifelse(sum(!is.na(early_leaver_educ)) > 0, adf.test(na.omit(early_leaver_educ))$p.value, NA),
+    adf_employment = ifelse(sum(!is.na(employment_value)) > 0, adf.test(na.omit(employment_value))$p.value, NA),
+    adf_gdp = ifelse(sum(!is.na(gdp_regione)) > 0, adf.test(na.omit(gdp_regione))$p.value, NA),
+    adf_ineq_ed = ifelse(sum(!is.na(inequality80_20)) > 0, adf.test(na.omit(inequality80_20))$p.value, NA),
+    adf_risk_pov = ifelse(sum(!is.na(risk_poverty)) > 0, adf.test(na.omit(risk_poverty))$p.value, NA)
+  )
+
+# Print results
+print(adf_results)
+
+# OLS model with differenced variables
+ols.d <- lm(l.early_leav ~ d.empl + d.ineq_ed + d.risk_pov, data = data)
+summary(ols.d)
+
+
+```
+
+## Heteroscedasticity
+ 
+```{r}
+bptest(l.early_leav ~ d.empl+  d.ineq_ed + d.risk_pov, data = data)
+```
+Based on the results of the studentized Breusch-Pagan test:
+Since the p-value is extremely small, much smaller than any reasonable significance level,there is strong evidence of heteroscedasticity in the regression model.
+
+```{r}
+# robust regression
+ols.d <- lm(l.early_leav ~ d.empl  + d.ineq_ed + d.risk_pov, data = data)
+robust_summary <- coeftest(ols.d, vcov = vcovHC(ols.d, type = "HC1"))
+
+#printing
+print(robust_summary)
+```
+## Analysis of the number of access in the emergency hospital
+```{r}
+anova<-aov(early_leaver_educ ~ ccaa, data=D) #run ANOVA 
+summary(anova) #view results
+
+```
+
+```{r}
+ols<-lm(emergency_care_access_per_1000_inhabitants~ gdp_regione + employment_value + inequality80_20 +risk_poverty, data=D)
+summary(ols)
+```
+```{r}
+fe<-plm(emergency_care_access_per_1000_inhabitants~ gdp_regione + employment_value + inequality80_20 +risk_poverty, data=D, index=c("ccaa","time_period"), model="within")
+#define model, data, unit and time variables, 'within' suggests *fixed effects estimator*
+summary(fe)
+```
+```{r}
+fe.dummy<-lm(emergency_care_access_per_1000_inhabitants~ gdp_regione + employment_value + inequality80_20 +risk_poverty +factor(ccaa)-1, data=D)
+summary(fe.dummy)
+```
+
+```{r}
+re<-plm(emergency_care_access_per_1000_inhabitants ~ gdp_regione + employment_value + 
+    inequality80_20 + risk_poverty, data=D, index=c("ccaa","time_period"), model="random")
+#same logic as FE estimation above, but "random" specifies RE estimator
+summary(re)
+```
+### Fixed or random effects?
+One way to check is to run the Hausman test. Here H0 is that
+the preferred model is RE. The alternative Ha is that it is FE.
+```{r}
+library(plm)
+phtest(fe,re)
+```
+
+P-Value > 0.05: Since the p-value is greater than the typical alpha level of 0.05, I do not have sufficient evidence to reject the null hypothesis. This means that there isn’t strong evidence suggesting that the fixed effects model is inconsistent compared to the random effects model.
+
+```{r}
+
+#Identifying columns
+cols <- c("emergency_care_access_per_1000_inhabitants", "gdp_regione", "employment_value", 
+          "inequality80_20", "risk_poverty", "ccaa", "time_period")
+D_clean <- subset(D, complete.cases(D[cols]))
+#ols model
+ols <- lm(emergency_care_access_per_1000_inhabitants ~ gdp_regione + employment_value + 
+          inequality80_20 + risk_poverty, data=D_clean)
+summary(ols)
+# Apply psce function on the model
+pcse_results <- pcse(ols, groupN=D_clean$ccaa, groupT=D_clean$time_period, pairwise=TRUE)
+#reuslts
+summary(pcse_results)
+
+```
+
+```{r}
+# Create lagged and differenced variables
+data <- data |> 
+  group_by(ccaa) |> 
+  mutate(
+    l.emergency = dplyr::lag(emergency_care_access_per_1000_inhabitants),          # Create lag of emergency_care_access_per_1000_inhabitants
+    d.empl = employment_value - dplyr::lag(employment_value),  # Create difference of employment
+    d.gdp.cap = gdp_regione - dplyr::lag(gdp_regione),      # Create difference of GDP per capita
+    d.ineq_ed = inequality80_20 - dplyr::lag(inequality80_20),  # Create difference of inequality in educational expenditure
+    d.risk_pov = risk_poverty - dplyr::lag(risk_poverty)    # Create difference of risk of poverty
+  )
+
+# Augmented Dickey-Fuller (ADF) test for each panel, removing NA
+adf_results <- data |> 
+  group_by(ccaa) |> 
+  summarize(
+    adf_emergency = ifelse(sum(!is.na(emergency_care_access_per_1000_inhabitants)) > 0, adf.test(na.omit(early_leaver_educ))$p.value, NA),
+    adf_employment = ifelse(sum(!is.na(employment_value)) > 0, adf.test(na.omit(employment_value))$p.value, NA),
+    adf_gdp = ifelse(sum(!is.na(gdp_regione)) > 0, adf.test(na.omit(gdp_regione))$p.value, NA),
+    adf_ineq_ed = ifelse(sum(!is.na(inequality80_20)) > 0, adf.test(na.omit(inequality80_20))$p.value, NA),
+    adf_risk_pov = ifelse(sum(!is.na(risk_poverty)) > 0, adf.test(na.omit(risk_poverty))$p.value, NA)
+  )
+
+# Print results
+print(adf_results)
+
+# OLS model with differenced variables
+ols.d <- lm(l.emergency ~ d.empl + d.ineq_ed + d.risk_pov, data = data)
+summary(ols.d)
+
+
+```
+
+The Augmented Dickey-Fuller (ADF) test is a statistical test used to determine whether a time series is stationary or has a unit root, meaning it exhibits a trend over time. In simpler terms, the ADF test helps to check if the data values in a time series are stable over time or if they are influenced by trends, seasonality, or other factors that make them non-stationary.
+Null Hypothesis (H₀): The time series has a unit root (i.e., it is non-stationary).
+Alternative Hypothesis (H₁): The time series does not have a unit root (i.e., it is stationary).
+the majority of cases in the results is non stationary, as we can see in the result.
+in the ols difference model there are no significant variables
+## Italy's descriptive analysis
+```{r, warning=FALSE}
+
+# Ensure that TIME_PERIOD is numeric
+data_italy$TIME_PERIOD <- as.numeric(data_italy$TIME_PERIOD)
+
+# colour palette
+palette <- c("#E41A1C", "#377EB8", "#4DAF4A", "firebrick4", "black",
+             "#FFFF33", "#A65628", "deeppink1", "#999999", "#66C2A5",
+             "#FC8D62", "#8DA0CB", "#E78AC3", "#A6D854", "#FFD92F","cyan1",
+             "#E5C494", "#B3B3B3", "mediumspringgreen", "mediumpurple3","navyblue")
+
+# Creating the graph
+ggplot(data_italy, aes(x = TIME_PERIOD, y = suicides, color = CCAA)) +
+  geom_line(size = 0.8) +  geom_point(size = 0.5) +
+  scale_color_manual(values = palette) + scale_x_continuous(breaks = seq(min(data_italy$TIME_PERIOD), max(data_italy$TIME_PERIOD), by = 2)) +
+  labs(title = "Suicides per region in Italy per 1000 citizens (2008-2020)",
+       subtitle = "",
+       x = "Year",
+       y = "Number of Suicides",
+       color = "Region") + # Labels and titles
+  theme_minimal() + # Minimal theme
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+
+```
+
+
+```{r, warning=FALSE}
+# Definire una palette di colori manualmente
+palette <- c("#E41A1C", "#377EB8", "#4DAF4A", "firebrick4", "black",
+             "#FFFF33", "#A65628", "deeppink1", "#999999", "#66C2A5",
+             "#FC8D62", "#8DA0CB", "#E78AC3", "#A6D854", "#FFD92F","cyan1",
+             "#E5C494", "#B3B3B3", "mediumspringgreen", "mediumpurple3","navyblue")
+# Creating the graph
+ggplot(data_italy, aes(x = TIME_PERIOD, y = early_leaver_educ, color = CCAA)) +
+  geom_line(size = 0.8) + 
+  geom_point(size = 0.5) + 
+  scale_color_manual(values = palette) + scale_x_continuous(breaks = seq(min(data_italy$TIME_PERIOD), max(data_italy$TIME_PERIOD), by = 2)) +
+  labs(title = "Early leavers in education",
+       x = "Year",
+       y = "Percentage of leavers",
+       color = "Region") + # Labels and titles
+  theme_minimal() + # Minimal theme
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+```
+
+
+
+```{r}
+#getting geo data
+italy <- ne_states(country = "Italy", returnclass = "sf")
+ #Step 1: Identify unique values in each column
+regions <- unique(italy$region)
+ccaa <- unique(data_italy$CCAA)
+
+ #Step 2: Create a mapping of CCAA to regions, including merging Bolzano and Trento into Trentino-Alto Adige
+mapping <- c(
+  "Piemonte"= "Piemonte",
+  "Abruzzo" = "Abruzzo",
+  "Basilicata" = "Basilicata",
+  "Calabria" = "Calabria",
+  "Campania" = "Campania",
+  "Emilia Romagna" = "Emilia-Romagna",  # Rename to match `region`
+  "Friuli Venezia Giulia" = "Friuli-Venezia Giulia",  # Rename to match `region`
+  "Lazio" = "Lazio",
+  "Liguria" = "Liguria",
+  "Lombardia" = "Lombardia",
+  "Marche" = "Marche",
+  "Molise" = "Molise",
+  "Provincia Autonoma Bolzano" = "Trentino-Alto Adige",  # Merge with Trentino-Alto Adige
+  "Provincia Autonoma Trento" = "Trentino-Alto Adige",  # Merge with Trentino-Alto Adige
+  "Puglia" = "Apulia",  # Rename to match `region`
+  "Sardegna" = "Sardegna",
+  "Sicilia" = "Sicily",  # Rename to match `region`
+  "Toscana" = "Toscana",
+  "Umbria" = "Umbria",
+  "Valle d'Aosta" = "Valle d'Aosta",
+  "Veneto" = "Veneto"
+  
+)
+
+# Step 3: Apply the mapping to `data_italy$CCAA`
+data_italy$CCAA <- mapping[data_italy$CCAA]
+
+# Verify the changes
+unique(data_italy$CCAA)
+
+
+```
+
+
+```{r, warning=FALSE}
+# Load geographical data
+italy <- ne_states(country = "Italy", returnclass = "sf")
+
+unique(italy$region)
+unique(data_italy$CCAA)
+# Filter the data 
+data_italy_filtered <- data_italy |> 
+  filter(TIME_PERIOD %in% c(2008, 2012, 2016, 2020))
+
+# Select the necessary columns and remove duplicates
+mapa <- data_italy_filtered |> 
+  select(CCAA, gender_gap_ind, TIME_PERIOD) |> 
+  distinct(CCAA, TIME_PERIOD, .keep_all = TRUE)
+
+# Check if there are NA values in the TIME_PERIOD field before the join
+print("Unique TIME_PERIOD values before join:")
+print(unique(mapa$TIME_PERIOD))
+
+# Join the geographical data with the gender gap data
+mapa <- italy |> 
+  left_join(mapa, by = c("region" = "CCAA"))
+
+# Check if there are NA values in the TIME_PERIOD field after the join
+print("Unique TIME_PERIOD values after join:")
+print(unique(mapa$TIME_PERIOD))
+
+# Filter the data again
+mapa <- mapa |> 
+  filter(TIME_PERIOD %in% c(2008, 2012, 2016, 2020))
+
+# Create the map
+p1 <- ggplot() +
+  geom_sf(data = italy, color = "black", size = 0.7) +  
+  geom_sf(data = mapa, aes(fill = gender_gap_ind), color = "black", size = 0.3) +  
+  annotate("rect", xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf, alpha = 0.2, fill = "white") +  
+  geom_sf_text(data = mapa, aes(label = round(gender_gap_ind, 2), color = ifelse(gender_gap_ind > 0.5, "black", "white")), 
+               size = 2.4, check_overlap = TRUE, nudge_y = -0.03) + 
+  theme_void() +  
+  labs(title = "Gender Gap Index in each region of Italy") +  
+  theme(
+    legend.position = "none",
+    plot.title = element_text(family = "Calibri", size = 14),
+    text = element_text(family = "Calibri"),
+    plot.background = element_rect(fill = "white", color = NA),  
+    panel.background = element_rect(fill = "white", color = NA)  
+  ) + 
+  coord_sf() +
+  scale_fill_gradient2(low = "lightgreen", mid = "yellow", high = "darkred", midpoint = median(data_italy_filtered$gender_gap_ind, na.rm = TRUE)) +
+  scale_color_identity() +
+  facet_wrap(~ TIME_PERIOD, ncol = 2) 
+
+# Print the plot
+print(p1)
+
+
+```
+
+```{r, warning=FALSE}
+# Load geographical data
+italy <- ne_states(country = "Italy", returnclass = "sf")
+
+unique(italy$region)
+unique(data_italy$CCAA)
+# Filter the data for the periods of interest
+data_italy_filtered <- data_italy |> 
+  filter(TIME_PERIOD %in% c(2008, 2012, 2016, 2020))
+
+# Select the necessary columns and remove duplicates
+mapa <- data_italy_filtered |> 
+  select(CCAA, suicides, TIME_PERIOD)  |> 
+  distinct(CCAA, TIME_PERIOD, .keep_all = TRUE)
+
+# Check if there are NA values in the TIME_PERIOD field before the join
+print("Unique TIME_PERIOD values before join:")
+print(unique(mapa$TIME_PERIOD))
+
+# Join the geographical data with the suicide data
+mapa <- italy |> 
+  left_join(mapa, by = c("region" = "CCAA"))
+
+# Check if there are NA values in the TIME_PERIOD field after the join
+print("Unique TIME_PERIOD values after join:")
+print(unique(mapa$TIME_PERIOD))
+
+# Filter the data again 
+mapa <- mapa |> 
+  filter(TIME_PERIOD %in% c(2008, 2012, 2016, 2020))
+
+# Create the map
+p1 <- ggplot() +
+  geom_sf(data = italy, color = "black", size = 0.7) +  
+  geom_sf(data = mapa, aes(fill = suicides), color = "black", size = 0.3) +  
+  annotate("rect", xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf, alpha = 0.2, fill = "white") +  
+  geom_sf_text(data = mapa, aes(label = round(suicides, 2), color = ifelse(suicides > 9, "black", "brown")), 
+               size = 2.4, check_overlap = TRUE, nudge_y = -0.03) + 
+  theme_void() +  
+  labs(title = "Suicides per Region in Italy") +  
+  theme(
+    legend.position = "none",
+    plot.title = element_text(family = "Calibri", size = 14),
+    text = element_text(family = "Calibri"),
+    plot.background = element_rect(fill = "white", color = NA),  
+    panel.background = element_rect(fill = "white", color = NA)  
+  ) + 
+  coord_sf() +
+  scale_fill_gradient2(low = "lightgreen", mid = "yellow", high = "darkred", midpoint = median(data_italy_filtered$suicides, na.rm = TRUE)) +
+  scale_color_identity() +
+  facet_wrap(~ TIME_PERIOD, ncol = 2)  # Create facets for TIME_PERIOD
+
+# Print the plot
+print(p1)
+
+```
+```{r, warning=FALSE}
+# Load geographical data
+italy <- ne_states(country = "Italy", returnclass = "sf")
+
+unique(italy$region)
+unique(data_italy$CCAA)
+
+# Filter the data for the periods of interest
+data_italy_filtered <- data_italy |> 
+  filter(TIME_PERIOD %in% c(2008, 2012, 2016, 2020))
+
+# Select the necessary columns and remove duplicates
+mapa <- data_italy_filtered |> 
+  select(CCAA, employment_value, TIME_PERIOD) |> 
+  distinct(CCAA, TIME_PERIOD, .keep_all = TRUE)
+
+# Check if there are NA values in the TIME_PERIOD field before the join
+print("Unique TIME_PERIOD values before join:")
+print(unique(mapa$TIME_PERIOD))
+
+# Join the geographical data with the employment data
+mapa <- italy %>%
+  left_join(mapa, by = c("region" = "CCAA"))
+
+# Check if there are NA values in the TIME_PERIOD field after the join
+print("Unique TIME_PERIOD values after join:")
+print(unique(mapa$TIME_PERIOD))
+
+# Filter the data again 
+mapa <- mapa |> 
+  filter(TIME_PERIOD %in% c(2008, 2012, 2016, 2020))
+
+# Create the map
+p1 <- ggplot() +
+  geom_sf(data = italy, color = "black", size = 0.7) +  
+  geom_sf(data = mapa, aes(fill = employment_value), color = "black", size = 0.3) +  
+  annotate("rect", xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf, alpha = 0.2, fill = "white") +  
+  geom_sf_text(data = mapa, aes(label = round(employment_value, 2), color = ifelse(employment_value > 9, "black", "brown")), 
+               size = 2.4, check_overlap = TRUE, nudge_y = -0.03) + 
+  theme_void() +  
+  labs(title = "Employment per Region in Italy") +  
+  theme(
+    legend.position = "none",
+    plot.title = element_text(family = "Calibri", size = 14),
+    text = element_text(family = "Calibri"),
+    plot.background = element_rect(fill = "white", color = NA),  
+    panel.background = element_rect(fill = "white", color = NA)  
+  ) + 
+  coord_sf() +
+  scale_fill_gradient2(low = "darkred", mid = "yellow", high = "lightgreen", midpoint = median(data_italy_filtered$employment_value, na.rm = TRUE)) +
+  scale_color_identity() +
+  facet_wrap(~ TIME_PERIOD, ncol = 2)  # Create facets for TIME_PERIOD
+
+# Print the plot
+print(p1)
+
+```
+the south is in a bad situation, and it's very clear in the graph
+```{r}
+
+# Create a new column to identify if the TIME_PERIOD is 2020 and label it appropriately
+data_italy <- data_italy |> 
+  mutate(is_2020_label = ifelse(TIME_PERIOD == 2020, "Year 2020", "Other Years"))
+
+# Filter out the extremes for labeling
+highest <- data_italy |> 
+  filter(not_work_or_study == max(not_work_or_study, na.rm = TRUE))
+
+lowest <- data_italy |> 
+  filter(not_work_or_study == min(not_work_or_study, na.rm = TRUE))
+
+extremes <- rbind(highest, lowest)
+
+
+scatter_plot <- ggplot(data_italy, aes(x = family_income, y = not_work_or_study, color = CCAA)) +
+  geom_label_repel(data = extremes, aes(label = paste(CCAA, TIME_PERIOD, sep = ", ")), size = 3.5, box.padding = 0.5, point.padding = 0.5) +
+  geom_point(aes(shape = is_2020_label), size = 1.7) +
+  scale_shape_manual(values = c("Other Years" = 16, "Year 2020" = 17)) + # Use 16 (circle) for other years and 17 (triangle) for 2020
+  scale_color_manual(values = palette) + # Use the custom defined palette
+  scale_y_continuous(limits = c(0, NA), breaks = seq(0, max(data_italy$not_work_or_study, na.rm = TRUE), by = 10)) + 
+  # The above line sets the lower limit to 0 and automatically adjusts the upper limit based on the data
+  labs(title = "Scatter Plot: Family Income vs Not Work or Study",
+       x = "Family Income",
+       y = "Not Working or Studying (%)",
+       color = "Region",
+       shape = "Year") + # Update the legend title for shapes
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    legend.position = "right",
+    legend.title = element_text(face = "bold"),
+    panel.grid.major = element_line(color = "grey80"),
+    panel.grid.minor = element_blank(),
+    axis.title.x = element_text(margin = margin(t = 10)),
+    axis.title.y = element_text(margin = margin(r = 10))
+  )
+
+# Display the plot with the adjusted y-axis
+scatter_plot
+```
+Also in this graph we can see a clear correlation.
+thank you.
